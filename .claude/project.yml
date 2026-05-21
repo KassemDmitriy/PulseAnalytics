@@ -1,0 +1,16 @@
+project:
+  name: PulseAnalytics
+  type: swift_package
+  swift_version: "6"
+  platforms:
+    - iOS 16+
+  concurrency: strict
+
+task_template: TASK_TEMPLATE.md
+
+conventions:
+  naming: PascalCase for types, camelCase for properties/methods
+  state: "@State private var for SwiftUI, let for constants"
+  architecture: SwiftUI patterns, no Combine, async/await only
+  testing: Swift Testing framework for unit tests
+  comments: DocC (///) for all public types and methods
