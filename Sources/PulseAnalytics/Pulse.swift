@@ -108,7 +108,9 @@ public enum Pulse {
         }
 
         // Subscribe to app lifecycle notifications
-        startLifecycleObserver()
+        if options.tracksLifecycleEvents {
+            startLifecycleObserver()
+        }
     }
 
     // MARK: - Tracking
@@ -227,6 +229,36 @@ public enum Pulse {
     private static func loadPersistedQueue(into queue: EventQueue, from store: any PersistenceStore) async {
         guard let events = try? await store.load() else { return }
         await queue.restore(events)
+    }
+
+    static var isObservingLifecycleEvents: Bool {
+        foregroundTask != nil || backgroundTask != nil
+    }
+
+    static var queuedEventCount: Int {
+        get async {
+            await eventQueue?.count ?? 0
+        }
+    }
+
+    static func resetForTesting() async {
+        foregroundTask?.cancel()
+        backgroundTask?.cancel()
+        foregroundTask = nil
+        backgroundTask = nil
+
+        await flushScheduler?.stop()
+        isConfigured = false
+        environment = .production
+        options = PulseOptions()
+        appID = ""
+        apiKey = ""
+        eventQueue = nil
+        sessionManager = nil
+        batchSender = nil
+        flushScheduler = nil
+        persistenceStore = nil
+        userID = nil
     }
 
     private static func startLifecycleObserver() {

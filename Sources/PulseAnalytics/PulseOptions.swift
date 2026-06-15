@@ -69,6 +69,9 @@ public struct PulseOptions: Sendable {
     /// Overrides ``endpoint``. Default: `nil`.
     public var supabase: SupabaseConfig?
 
+    /// Whether Pulse should automatically track foreground, background, and session events. Default: `true`.
+    public var tracksLifecycleEvents: Bool
+
     /// Creates a `PulseOptions` value with all defaults applied.
     public init(
         batchSize: Int = 20,
@@ -76,7 +79,8 @@ public struct PulseOptions: Sendable {
         maxQueueSize: Int = 500,
         logLevel: LogLevel = .none,
         endpoint: URL? = nil,
-        supabase: SupabaseConfig? = nil
+        supabase: SupabaseConfig? = nil,
+        tracksLifecycleEvents: Bool = true
     ) {
         self.batchSize = batchSize
         self.flushInterval = flushInterval
@@ -84,6 +88,7 @@ public struct PulseOptions: Sendable {
         self.logLevel = logLevel
         self.endpoint = endpoint
         self.supabase = supabase
+        self.tracksLifecycleEvents = tracksLifecycleEvents
     }
 }
 

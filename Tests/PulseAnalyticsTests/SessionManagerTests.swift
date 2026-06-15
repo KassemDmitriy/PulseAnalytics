@@ -70,9 +70,11 @@ struct SessionManagerTests {
 
         let dict = EventSerializer.serialize(
             .screenViewed(PulseScreen("home")),
+            eventID: UUID(),
             sessionID: sessionID,
             userID: nil,
             appID: "com.test",
+            installID: UUID(),
             deviceInfo: device
         )
 

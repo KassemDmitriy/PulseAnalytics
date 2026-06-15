@@ -7,6 +7,7 @@ struct AnyCodable: Codable, @unchecked Sendable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
+        if container.decodeNil() { value = NSNull(); return }
         if let int = try? container.decode(Int.self) { value = int; return }
         if let double = try? container.decode(Double.self) { value = double; return }
         if let bool = try? container.decode(Bool.self) { value = bool; return }
@@ -25,6 +26,7 @@ struct AnyCodable: Codable, @unchecked Sendable {
         case let string as String: try container.encode(string)
         case let dict as [String: AnyCodable]: try container.encode(dict)
         case let array as [AnyCodable]: try container.encode(array)
+        case is NSNull: try container.encodeNil()
         default:
             let context = EncodingError.Context(codingPath: container.codingPath, debugDescription: "Unsupported type")
             throw EncodingError.invalidValue(value, context)

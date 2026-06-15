@@ -14,7 +14,7 @@ struct PersistenceStoreTests {
     }
 
     private func makeEvent(index: Int) -> QueuedEvent {
-        QueuedEvent(payload: ["index": .int(index), "name": .string("event_\(index)")])
+        QueuedEvent(eventID: UUID(), payload: ["index": index, "name": "event_\(index)"])
     }
 
     @Test("Save and load restores all events")
@@ -28,7 +28,7 @@ struct PersistenceStoreTests {
         #expect(loaded.count == events.count)
         for (original, restored) in zip(events, loaded) {
             #expect(original.id == restored.id)
-            #expect(original.payload["index"] == restored.payload["index"])
+            #expect(original.payload["index"]?.value as? Int == restored.payload["index"]?.value as? Int)
         }
     }
 
@@ -55,26 +55,26 @@ struct PersistenceStoreTests {
         try await store.save([makeEvent(index: 99)])
         let loaded = try await store.load()
         #expect(loaded.count == 1)
-        #expect(loaded[0].payload["index"] == .int(99))
+        #expect(loaded[0].payload["index"]?.value as? Int == 99)
     }
 
     @Test("Payload values survive round-trip correctly")
     func payloadRoundTrip() async throws {
         let store = makeTempStore()
-        let event = QueuedEvent(payload: [
-            "str": .string("hello"),
-            "num": .int(42),
-            "dbl": .double(3.14),
-            "bool": .bool(true),
-            "nil": .null
+        let event = QueuedEvent(eventID: UUID(), payload: [
+            "str": "hello",
+            "num": 42,
+            "dbl": 3.14,
+            "bool": true,
+            "nil": NSNull()
         ])
         try await store.save([event])
         let loaded = try await store.load()
         let restored = loaded[0]
-        #expect(restored.payload["str"] == .string("hello"))
-        #expect(restored.payload["num"] == .int(42))
-        #expect(restored.payload["dbl"] == .double(3.14))
-        #expect(restored.payload["bool"] == .bool(true))
-        #expect(restored.payload["nil"] == .null)
+        #expect(restored.payload["str"]?.value as? String == "hello")
+        #expect(restored.payload["num"]?.value as? Int == 42)
+        #expect(restored.payload["dbl"]?.value as? Double == 3.14)
+        #expect(restored.payload["bool"]?.value as? Bool == true)
+        #expect(restored.payload["nil"]?.value is NSNull)
     }
 }

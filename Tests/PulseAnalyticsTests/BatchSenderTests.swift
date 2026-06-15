@@ -37,7 +37,7 @@ struct BatchSenderTests {
     private let endpoint = URL(string: "https://api.example.com/events")!
 
     private func makeEvent(id: Int = 0) -> QueuedEvent {
-        QueuedEvent(payload: ["event": .string("test"), "index": .int(id)])
+        QueuedEvent(eventID: UUID(), payload: ["event": "test", "index": id])
     }
 
     @Test("200 response returns true (success)")

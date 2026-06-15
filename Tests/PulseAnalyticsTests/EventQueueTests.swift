@@ -6,7 +6,7 @@ import Foundation
 struct EventQueueTests {
 
     private func makeEvent(id: Int = 0) -> QueuedEvent {
-        QueuedEvent(payload: ["index": .int(id)])
+        QueuedEvent(eventID: UUID(), payload: ["index": id])
     }
 
     @Test("Enqueue and dequeue returns events in FIFO order")
@@ -18,8 +18,8 @@ struct EventQueueTests {
 
         let batch = await queue.dequeue(upTo: 2)
         #expect(batch.count == 2)
-        #expect(batch[0].payload["index"] == .int(1))
-        #expect(batch[1].payload["index"] == .int(2))
+        #expect(batch[0].payload["index"]?.value as? Int == 1)
+        #expect(batch[1].payload["index"]?.value as? Int == 2)
         let remaining = await queue.count
         #expect(remaining == 1)
     }
@@ -52,10 +52,7 @@ struct EventQueueTests {
         #expect(count == maxSize)
 
         let all = await queue.allEvents
-        let ids = all.compactMap { $0.payload["index"] }.map { value -> Int in
-            if case .int(let v) = value { return v }
-            return -1
-        }
+        let ids = all.compactMap { $0.payload["index"]?.value as? Int }
         #expect(!ids.contains(1), "Oldest event (id=1) should have been dropped")
         #expect(ids.contains(4), "Newest event (id=4) should be present")
     }
@@ -85,7 +82,7 @@ struct EventQueueTests {
         let count = await queue.count
         #expect(count == 2)
         let all = await queue.allEvents
-        #expect(all[0].payload["index"] == .int(10))
+        #expect(all[0].payload["index"]?.value as? Int == 10)
     }
 
     @Test("Restore respects maxSize")

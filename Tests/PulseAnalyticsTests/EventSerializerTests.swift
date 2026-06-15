@@ -206,9 +206,11 @@ struct EventSerializerTests {
     func serializeTopLevelFields() {
         let dict = EventSerializer.serialize(
             .sessionStarted,
+            eventID: UUID(),
             sessionID: session,
             userID: "user-1",
             appID: "com.test",
+            installID: UUID(),
             deviceInfo: device
         )
         #expect(dict["event"] as? String == "session_started")
@@ -223,9 +225,11 @@ struct EventSerializerTests {
     func serializeNoUserID() {
         let dict = EventSerializer.serialize(
             .sessionStarted,
+            eventID: UUID(),
             sessionID: session,
             userID: nil,
             appID: "com.test",
+            installID: UUID(),
             deviceInfo: device
         )
         #expect(dict["user_id"] == nil)
