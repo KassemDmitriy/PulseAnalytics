@@ -9,6 +9,18 @@ protocol HTTPClient: Sendable {
 
 extension URLSession: HTTPClient {}
 
+/// Result of a `BatchSender.send(_:)` call.
+///
+/// The caller uses this to decide whether to re-enqueue the batch.
+enum SendOutcome: Sendable, Equatable {
+    /// 2xx or 409 duplicate — the batch is delivered or already in the DB.
+    case delivered
+    /// 429, 5xx, or network error — transient; caller should re-enqueue.
+    case retryableFailure
+    /// 400, 401, 403 — permanent client error; caller should drop the batch.
+    case permanentFailure
+}
+
 /// Sends batches of events to the configured endpoint.
 ///
 /// On success, events are removed from the queue.
@@ -46,15 +58,15 @@ actor BatchSender {
 
     /// Attempts to send the given events to the endpoint.
     ///
-    /// - Returns: `true` if the batch was accepted by the server, `false` otherwise.
-    ///   On failure the caller is responsible for retaining the events in the queue.
+    /// - Returns: A ``SendOutcome`` indicating whether the batch was delivered,
+    ///   should be re-enqueued, or should be dropped permanently.
     @discardableResult
-    func send(_ events: [QueuedEvent]) async -> Bool {
-        guard !events.isEmpty else { return true }
+    func send(_ events: [QueuedEvent]) async -> SendOutcome {
+        guard !events.isEmpty else { return .delivered }
 
         if isSending {
             log("Concurrent send attempt detected, skipping this send.", level: .verbose)
-            return false
+            return .retryableFailure
         }
 
         isSending = true
@@ -65,14 +77,13 @@ actor BatchSender {
             do {
                 let success = try await attemptSend(events)
                 if success {
-                    return true
+                    return .delivered
                 }
-                // If attemptSend returns false (should never happen with current logic), treat as retryable
             } catch let error as SendError {
                 switch error {
                 case .fatal(let status):
-                    log("Batch send fatal error (HTTP \(status)) — will not retry.", level: .error)
-                    return false
+                    log("Batch send fatal error (HTTP \(status)) — dropping batch.", level: .error)
+                    return .permanentFailure
                 case .retryable:
                     log("Batch send retryable error (attempt \(attempt + 1)) — will retry.", level: .error)
                 }
@@ -90,7 +101,7 @@ actor BatchSender {
         }
 
         log("Batch send failed after \(Self.maxRetries) attempts — keeping \(events.count) events in queue.", level: .error)
-        return false
+        return .retryableFailure
     }
 
     // MARK: - Private
@@ -126,6 +137,10 @@ actor BatchSender {
             switch statusCode {
             case 200...299:
                 log("Batch sent (\(events.count) events) — HTTP \(statusCode)", level: .verbose)
+                return true
+            case 409:
+                // Duplicate event_id already in DB — idempotent, treat as delivered.
+                log("Batch duplicate (HTTP 409) — already in DB, dropping batch.", level: .verbose)
                 return true
             case 400, 401, 403:
                 log("Batch send fatal HTTP error \(statusCode)", level: .error)

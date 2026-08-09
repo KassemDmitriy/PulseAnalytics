@@ -40,42 +40,84 @@ struct BatchSenderTests {
         QueuedEvent(eventID: UUID(), payload: ["event": "test", "index": id])
     }
 
-    @Test("200 response returns true (success)")
-    func successReturnsTrue() async {
+    @Test("200 response returns delivered")
+    func successReturnsDelivered() async {
         let client = MockHTTPClient(statusCode: 200)
         let sender = BatchSender(appID: "com.test", apiKey: "key", endpoint: endpoint, httpClient: client)
-        let events = [makeEvent(id: 1)]
-        let result = await sender.send(events)
-        #expect(result == true)
+        let result = await sender.send([makeEvent(id: 1)])
+        #expect(result == .delivered)
+        #expect(client.callCount == 1)
     }
 
-    @Test("500 response returns false after all retries")
-    func serverErrorReturnsFalse() async {
+    @Test("409 returns delivered without retrying (idempotent duplicate)")
+    func conflictReturnsDelivered() async {
+        let client = MockHTTPClient(statusCode: 409)
+        let sender = BatchSender(appID: "com.test", apiKey: "key", endpoint: endpoint, httpClient: client)
+        let result = await sender.send([makeEvent()])
+        #expect(result == .delivered)
+        #expect(client.callCount == 1)
+    }
+
+    @Test("400 returns permanentFailure without retrying")
+    func badRequestReturnsPermanentFailure() async {
+        let client = MockHTTPClient(statusCode: 400)
+        let sender = BatchSender(appID: "com.test", apiKey: "key", endpoint: endpoint, httpClient: client)
+        let result = await sender.send([makeEvent()])
+        #expect(result == .permanentFailure)
+        #expect(client.callCount == 1)
+    }
+
+    @Test("401 returns permanentFailure without retrying")
+    func unauthorizedReturnsPermanentFailure() async {
+        let client = MockHTTPClient(statusCode: 401)
+        let sender = BatchSender(appID: "com.test", apiKey: "key", endpoint: endpoint, httpClient: client)
+        let result = await sender.send([makeEvent()])
+        #expect(result == .permanentFailure)
+        #expect(client.callCount == 1)
+    }
+
+    @Test("403 returns permanentFailure without retrying")
+    func forbiddenReturnsPermanentFailure() async {
+        let client = MockHTTPClient(statusCode: 403)
+        let sender = BatchSender(appID: "com.test", apiKey: "key", endpoint: endpoint, httpClient: client)
+        let result = await sender.send([makeEvent()])
+        #expect(result == .permanentFailure)
+        #expect(client.callCount == 1)
+    }
+
+    @Test("429 returns retryableFailure after all retries")
+    func rateLimitedReturnsRetryableFailure() async {
+        let client = MockHTTPClient(statusCode: 429)
+        let sender = BatchSender(appID: "com.test", apiKey: "key", endpoint: endpoint, httpClient: client)
+        let result = await sender.send([makeEvent()])
+        #expect(result == .retryableFailure)
+        #expect(client.callCount == 3)
+    }
+
+    @Test("500 response returns retryableFailure after all retries")
+    func serverErrorReturnsRetryableFailure() async {
         let client = MockHTTPClient(statusCode: 500)
         let sender = BatchSender(appID: "com.test", apiKey: "key", endpoint: endpoint, httpClient: client)
-        let events = [makeEvent(id: 1)]
-        let result = await sender.send(events)
-        #expect(result == false)
-        // Should have retried exactly maxRetries (3) times
+        let result = await sender.send([makeEvent(id: 1)])
+        #expect(result == .retryableFailure)
         #expect(client.callCount == 3)
     }
 
-    @Test("Network error returns false after all retries")
-    func networkErrorReturnsFalse() async {
+    @Test("Network error returns retryableFailure after all retries")
+    func networkErrorReturnsRetryableFailure() async {
         let client = MockHTTPClient(shouldThrow: true)
         let sender = BatchSender(appID: "com.test", apiKey: "key", endpoint: endpoint, httpClient: client)
-        let events = [makeEvent(id: 1)]
-        let result = await sender.send(events)
-        #expect(result == false)
+        let result = await sender.send([makeEvent(id: 1)])
+        #expect(result == .retryableFailure)
         #expect(client.callCount == 3)
     }
 
-    @Test("Empty batch returns true without making any request")
+    @Test("Empty batch returns delivered without making any request")
     func emptyBatch() async {
         let client = MockHTTPClient()
         let sender = BatchSender(appID: "com.test", apiKey: "key", endpoint: endpoint, httpClient: client)
         let result = await sender.send([])
-        #expect(result == true)
+        #expect(result == .delivered)
         #expect(client.callCount == 0)
     }
 
@@ -99,7 +141,7 @@ struct BatchSenderTests {
         let client = FlakyClient()
         let sender = BatchSender(appID: "com.test", apiKey: "key", endpoint: endpoint, httpClient: client)
         let result = await sender.send([makeEvent()])
-        #expect(result == true)
+        #expect(result == .delivered)
         #expect(client.callCount == 2)
     }
 }

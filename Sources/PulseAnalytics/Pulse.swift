@@ -211,9 +211,9 @@ public enum Pulse {
         let batch = await queue.dequeue(upTo: options.batchSize)
         guard !batch.isEmpty else { return }
 
-        let sent = await sender.send(batch)
-        if !sent {
-            // Re-enqueue failed events at the front (best-effort)
+        let outcome = await sender.send(batch)
+        if outcome == .retryableFailure {
+            // Re-enqueue only transient failures; duplicates and permanent errors are dropped.
             for event in batch.reversed() {
                 await queue.enqueue(event)
             }
